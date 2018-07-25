@@ -3,8 +3,6 @@ package cn.leo.chineseocr.OCR;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Environment;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 
 import com.googlecode.tesseract.android.TessBaseAPI;
@@ -12,6 +10,8 @@ import com.googlecode.tesseract.android.TessBaseAPI;
 import java.io.File;
 
 import cn.leo.chineseocr.BuildConfig;
+import cn.leo.magic.annotation.RunOnIOThread;
+import cn.leo.magic.annotation.RunOnUIThread;
 
 /**
  * create by : Jarry Leo
@@ -22,7 +22,6 @@ public class OcrScanner {
     private static TessBaseAPI mTess;
     private Context mContext;
     private boolean mInit;
-    private Handler mHandler = new Handler(Looper.myLooper());
     private OnOcrResultListener mOnOcrResultListener;
 
     public static OcrScanner build(Context context) {
@@ -34,15 +33,11 @@ public class OcrScanner {
         copyFile();
     }
 
+    @RunOnIOThread
     private void copyFile() {
-        final File dir = new File(dataPath + "tessdata/");
-        new Thread() {
-            @Override
-            public void run() {
-                FileUtil.CopyAssets(mContext, "tessdata", dir.getAbsolutePath());
-                initTessBaseData(dataPath);
-            }
-        }.start();
+        File dir = new File(dataPath + "tessdata/");
+        FileUtil.CopyAssets(mContext, "tessdata", dir.getAbsolutePath());
+        initTessBaseData(dataPath);
     }
 
     private void initTessBaseData(String dataPath) {
@@ -52,25 +47,16 @@ public class OcrScanner {
         mInit = mTess.init(dataPath, language);
     }
 
-
-    public void scan(final Bitmap bitmap) {
-        new Thread() {
-            @Override
-            public void run() {
-                String s = ocrTextScan(bitmap);
-                callback(s);
-            }
-        }.start();
+    @RunOnIOThread
+    public void scan(Bitmap bitmap) {
+        if (mOnOcrResultListener == null) return;
+        String s = ocrTextScan(bitmap);
+        callback(s);
     }
 
-    private void callback(final String result) {
-        if (mOnOcrResultListener == null) return;
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                mOnOcrResultListener.onOcrResult(result);
-            }
-        });
+    @RunOnUIThread
+    private void callback(String result) {
+        mOnOcrResultListener.onOcrResult(result);
     }
 
     private String ocrTextScan(Bitmap bitmap) {
